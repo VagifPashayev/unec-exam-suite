@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+env/
+
+# Environment files — contain real tokens/passwords, never commit these
+.env
+*.env
+
+# Quiz image data — too large for git, add manually
+desktop/quiz_data/
+web/static/quiz_data/
+
+# Generated result files
+results/
+result*.docx
+web/results/
+
+# Telegram bot state
+telegram_quiz/approved_users.json
+
+# LMS bot user data
+lms_bot/data/allowed_users.json
+
+# Build output
+*.exe
+*.spec
+dist/
+build/
+
+# Android build artifacts
+*.apk
+*.aab
+.gradle/
+
+# Editors & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
