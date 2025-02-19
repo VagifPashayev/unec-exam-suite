@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Question {{ question_id }}</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 0; text-align: center; }
+    .container { max-width: 720px; margin: 24px auto; background: #fff; padding: 24px; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
+    .progress-bar { height: 8px; background: #e0e0e0; border-radius: 4px; margin-bottom: 16px; overflow: hidden; }
+    .progress-fill { height: 100%; background: #1976d2; border-radius: 4px; transition: width 0.3s; }
+    .stats { color: #555; font-size: 14px; margin-bottom: 16px; }
+    img.question-img { max-width: 100%; height: auto; margin-bottom: 20px; border-radius: 6px; }
+    .option { margin: 10px 0; }
+    .option button {
+      padding: 10px 20px;
+      font-size: 15px;
+      border: 2px solid #1976d2;
+      border-radius: 8px;
+      background: #fff;
+      color: #1976d2;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .option button:hover { background: #1976d2; color: #fff; }
+    .option button img { height: 80px; vertical-align: middle; pointer-events: none; }
+    .home-link { display: inline-block; margin-top: 20px; color: #888; font-size: 13px; text-decoration: none; }
+    .home-link:hover { color: #333; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="progress-bar">
+    <div class="progress-fill" style="width: {{ (question_id / total * 100)|int }}%"></div>
+  </div>
+
+  <div class="stats">
+    Question {{ question_id }} / {{ total }} &nbsp;·&nbsp;
+    ✅ {{ stats.score }} &nbsp; ❌ {{ stats.wrong }} &nbsp; 🔥 {{ stats.streak }}
+  </div>
+
+  <img class="question-img" src="/static/quiz_data/{{ qimage }}" alt="Question">
+
+  <form method="post" action="/answer">
+    {% for label, img in options %}
+      <div class="option">
+        <button name="choice" value="{{ label }}" type="submit">
+          <img src="/static/quiz_data/{{ img }}" alt="option">
+        </button>
+      </div>
+    {% endfor %}
+  </form>
+
+  <a class="home-link" href="{{ url_for('index') }}">↩ Back to start</a>
+</div>
+</body>
+</html>

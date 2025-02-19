@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Start Quiz</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: sans-serif;
+      background: linear-gradient(135deg, #e3f2fd, #ffffff);
+      padding: 40px 20px;
+      text-align: center;
+      margin: 0;
+    }
+    h1 { color: #1976d2; margin-bottom: 8px; }
+    p.hint { color: #666; margin-bottom: 24px; font-size: 14px; }
+    form {
+      max-width: 420px;
+      margin: 0 auto;
+      background: #fff;
+      padding: 28px;
+      border-radius: 14px;
+      box-shadow: 0 2px 16px rgba(0,0,0,0.1);
+    }
+    label { display: block; margin-top: 16px; font-weight: 600; text-align: left; }
+    input {
+      width: 100%;
+      padding: 9px 12px;
+      margin-top: 6px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      font-size: 15px;
+    }
+    .divider { margin: 20px 0; color: #aaa; font-size: 13px; }
+    button {
+      margin-top: 24px;
+      width: 100%;
+      background: #1976d2;
+      color: #fff;
+      border: none;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:hover { background: #0d47a1; }
+    .error { color: #c62828; margin-top: 12px; font-size: 14px; }
+  </style>
+  <script defer>
+    function toggleRequired() {
+      const custom = document.getElementById("custom").value.trim();
+      ["qmin", "qmax", "count"].forEach(id => {
+        const el = document.getElementById(id);
+        custom ? el.removeAttribute("required") : el.setAttribute("required", "required");
+      });
+    }
+  </script>
+</head>
+<body>
+  <h1>Quiz</h1>
+  <p class="hint">Available questions: {{ min_q }} – {{ max_q }}</p>
+
+  {% if error %}
+    <p class="error">{{ error }}</p>
+  {% endif %}
+
+  <form method="POST">
+    <label for="qmin">From question</label>
+    <input type="number" name="qmin" id="qmin" min="{{ min_q }}" max="{{ max_q }}" required>
+
+    <label for="qmax">To question</label>
+    <input type="number" name="qmax" id="qmax" min="{{ min_q }}" max="{{ max_q }}" required>
+
+    <label for="count">How many questions</label>
+    <input type="number" name="count" id="count" min="1" required>
+
+    <div class="divider">— or enter specific question numbers —</div>
+
+    <label for="custom">Question numbers (e.g. 12 56 88)</label>
+    <input type="text" name="custom" id="custom" oninput="toggleRequired()" placeholder="optional">
+
+    <button type="submit">Start →</button>
+  </form>
+</body>
+</html>
