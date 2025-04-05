@@ -1,0 +1,2 @@
+Pillow
+pdf2image

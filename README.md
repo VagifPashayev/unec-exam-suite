@@ -1,6 +1,6 @@
 # unec-exam-suite
 
-A collection of self-study tools built around UNEC/ASOIU exam preparation. Each tool solves a specific part of the workflow — converting PDFs to test files, running quizzes on desktop or in the browser, and checking grades via Telegram.
+A collection of self-study tools built around UNEC/ASOIU exam preparation. Each tool solves a specific part of the workflow — building quiz data from PDFs, converting text exams to quiz files, running quizzes on desktop or in the browser, and running a full quiz bot on Telegram.
 
 Built for personal use. Everything actually ran and was used during exam sessions.
 
@@ -10,11 +10,11 @@ Built for personal use. Everything actually ran and was used during exam session
 
 ```
 unec-exam-suite/
-├── pdf_to_docx/        # Convert exam PDFs to quiz-ready .docx files
+├── quiz_creator/       # Tkinter GUI for cropping PDF pages into quiz images
+├── pdf_to_docx/        # Convert text exam PDFs to quiz-ready .docx files
 ├── desktop/            # Tkinter desktop quiz app (image-based questions)
 ├── telegram_quiz/      # Telegram bot for text-based quizzes from .docx
 ├── web/                # Flask web quiz with the same image-based format
-├── lms_bot/            # Telegram bot that fetches grades from the LMS
 └── tests/              # pytest test suite
 ```
 
@@ -22,7 +22,31 @@ unec-exam-suite/
 
 ## Tools
 
-### 1. `pdf_to_docx` — PDF to quiz converter
+### 1. `quiz_creator` — PDF crop tool for building image quiz data
+
+A visual desktop tool for converting exam PDFs into image-based quiz data. You open a PDF, draw a selection rectangle over each question and its answer options, mark the correct answer, and the tool saves everything to a `quiz_data/` folder with a `metadata.json` index. That folder is what the `desktop` and `web` quiz players read.
+
+**Requirements:**
+- [Poppler for Windows](https://github.com/oschwartz10612/poppler-windows/releases) — needed by `pdf2image` to render PDF pages
+- Set the `POPPLER_PATH` environment variable to your Poppler `bin/` folder, or edit the fallback path at the top of `quiz_creator.py`
+
+**Usage:**
+```bash
+cd quiz_creator
+pip install -r requirements.txt
+python quiz_creator.py
+```
+
+**Workflow:**
+1. Click **Load PDF** and open your exam file
+2. Draw a box around the question text → confirm → repeat for options A through E
+3. Enter the correct answer letter when prompted
+4. Navigate pages with Prev/Next; use Ctrl+/- to zoom
+5. When done, copy the generated `quiz_data/` folder into `desktop/` or `web/static/`
+
+---
+
+### 2. `pdf_to_docx` — PDF to quiz converter
 
 Parses exam PDFs (where answers are marked with `√` and wrong options with `•`) and produces a structured `.docx` file that the Telegram quiz bot can read.
 
@@ -49,24 +73,9 @@ The output `.docx` will have questions numbered like `1. Question text` with opt
 
 ---
 
-### 2. `desktop` — Tkinter quiz app (image questions)
+### 3. `desktop` — Tkinter quiz app (image questions)
 
-A desktop GUI quiz player for questions where both the question and all answer options are images (screenshots of exam slides). Requires a `quiz_data/` folder with images and a `metadata.json` index.
-
-**`metadata.json` format:**
-```json
-{
-  "q1": {
-    "question": "q1_question.png",
-    "options": {
-      "opt_a.png": "opt_a.png",
-      "opt_b.png": "opt_b.png",
-      "opt_c.png": "opt_c.png"
-    },
-    "correct": "opt_b.png"
-  }
-}
-```
+A desktop GUI quiz player for questions where both the question and all answer options are images. Requires a `quiz_data/` folder built with the `quiz_creator` tool.
 
 **Usage:**
 ```bash
@@ -79,7 +88,7 @@ On start it asks for a question range and count. Options are shuffled on each qu
 
 ---
 
-### 3. `telegram_quiz` — Telegram bot (text questions from .docx)
+### 4. `telegram_quiz` — Telegram bot (text questions from .docx)
 
 A fully async Telegram bot that reads `.docx` files you drop in its folder and runs interactive quizzes via inline buttons. Access is gated — new users send a join request that the admin approves or denies from within Telegram.
 
@@ -115,7 +124,7 @@ python main.py
 
 ---
 
-### 4. `web` — Flask web quiz (image questions)
+### 5. `web` — Flask web quiz (image questions)
 
 Same quiz format as the desktop app but runs in the browser. Useful when sharing with others — just run the server and give them the URL.
 
@@ -141,37 +150,6 @@ python app.py
 
 ---
 
-### 5. `lms_bot` — LMS grade checker (Telegram)
-
-Fetches grades from the ASOIU LMS (`lms.asoiu.edu.az`) for a list of students and displays them by subject and academic year. Same approve/deny access system as the quiz bot.
-
-**Setup:**
-```bash
-cd lms_bot
-pip install -r requirements.txt
-cp .env.example .env
-# Fill in BOT_TOKEN, ADMIN_ID, LMS_USERNAME, LMS_PASSWORD
-cp data/students.json.example data/students.json
-# Edit students.json with real person_id values from the LMS
-```
-
-**Run:**
-```bash
-python bot.py
-```
-
-**`data/students.json` format:**
-```json
-[
-  { "name": "John Doe", "person_id": 123456 },
-  { "name": "Jane Smith", "person_id": 789012 }
-]
-```
-
-The bot auto-restarts on crash with a 5-second delay.
-
----
-
 ## Running tests
 
 ```bash
@@ -185,14 +163,13 @@ Tests cover: question loader, PDF parser, progress bar utility, and Flask web ro
 
 ## Environment variables
 
-Each bot has its own `.env.example`. Copy it to `.env` and fill in the values. **Never commit `.env` files.**
-
 | Variable | Used in | Description |
 |---|---|---|
-| `BOT_TOKEN` | telegram_quiz, lms_bot | Telegram bot token from @BotFather |
-| `ADMIN_ID` | telegram_quiz, lms_bot | Your Telegram user ID |
-| `LMS_USERNAME` | lms_bot | ASOIU LMS login |
-| `LMS_PASSWORD` | lms_bot | ASOIU LMS password |
+| `BOT_TOKEN` | telegram_quiz | Telegram bot token from @BotFather |
+| `ADMIN_ID` | telegram_quiz | Your Telegram user ID |
+| `POPPLER_PATH` | quiz_creator | Path to Poppler `bin/` folder (Windows only) |
+
+Each bot has its own `.env.example`. Copy it to `.env` and fill in the values. **Never commit `.env` files.**
 
 ---
 
@@ -200,8 +177,8 @@ Each bot has its own `.env.example`. Copy it to `.env` and fill in the values. *
 
 | Tool | Key dependencies |
 |---|---|
+| `quiz_creator` | Pillow, pdf2image, Poppler |
 | `pdf_to_docx` | PyMuPDF, python-docx |
 | `desktop` | Pillow, python-docx |
 | `telegram_quiz` | python-telegram-bot v21, python-docx, python-dotenv |
 | `web` | Flask, python-docx |
-| `lms_bot` | aiogram v3, requests, python-dotenv |
