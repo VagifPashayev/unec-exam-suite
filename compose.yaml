@@ -1,0 +1,43 @@
+name: unec-exam-bot
+
+services:
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      DATA_DIR: /app/data
+      QUIZ_DIR: /app/telegram_quiz/quizzes
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    volumes:
+      - bot_data:/app/data
+    networks:
+      - bot_network
+    healthcheck:
+      test: ["CMD", "python", "telegram_quiz/healthcheck.py"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    cpus: 0.35
+    mem_limit: 256m
+    pids_limit: 128
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+networks:
+  bot_network:
+    driver: bridge
+
+volumes:
+  bot_data:

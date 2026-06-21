@@ -1,62 +1,121 @@
+"""Telegram polling application entry point."""
+
+from __future__ import annotations
+
 import logging
+
 from telegram import Update
 from telegram.error import TelegramError
 from telegram.ext import (
     ApplicationBuilder,
-    CommandHandler,
-    MessageHandler,
     CallbackQueryHandler,
+    CommandHandler,
     ConversationHandler,
+    MessageHandler,
     filters,
 )
-from config import TOKEN
+
+from config import TOKEN, USER_LANGUAGES, validate_config
 from handlers import (
-    start, select_topic, handle_range, handle_count, handle_question_amount,
-    handle_callback, cancel, handle_main_menu, handle_approval, demote_user, list_users,
-    SELECT_TOPIC, SELECT_RANGE, SELECT_COUNT, SELECT_QUESTION_AMOUNT, QUIZ,
+    QUIZ,
+    SELECT_AMOUNT,
+    SELECT_END,
+    SELECT_LANGUAGE,
+    SELECT_RANGE,
+    SELECT_TOPIC,
+    cancel,
+    demote_user,
+    handle_approval,
+    handle_callback,
+    handle_end,
+    handle_main_menu,
+    handle_question_amount,
+    handle_range,
+    language_command,
+    list_users,
+    select_language,
+    select_topic,
+    start,
 )
+from i18n import t
+
+
+class TokenRedactingFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        if TOKEN:
+            record.msg = record.getMessage().replace(TOKEN, "<redacted>")
+            record.args = ()
+        return True
+
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
+for handler in logging.getLogger().handlers:
+    handler.addFilter(TokenRedactingFilter())
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("telegram.request").setLevel(logging.WARNING)
+LOGGER = logging.getLogger(__name__)
 
 
-async def error_handler(update: Update, context):
-    logging.exception("Unhandled exception:")
+async def error_handler(update: Update | None, context) -> None:
+    LOGGER.error(
+        "Unhandled exception while processing an update",
+        exc_info=(type(context.error), context.error, context.error.__traceback__),
+    )
     try:
         if update and update.effective_chat:
+            language = USER_LANGUAGES.get(update.effective_user.id, "en")
             await context.bot.send_message(
                 chat_id=update.effective_chat.id,
-                text="⚠️ Something went wrong. Try again.",
+                text=t(language, "generic_error"),
             )
     except TelegramError:
-        pass
+        LOGGER.warning("Could not send the error notification", exc_info=True)
 
 
-def main():
-    app = ApplicationBuilder().token(TOKEN).build()
-
-    conv = ConversationHandler(
-        entry_points=[CommandHandler("start", start)],
+def build_application():
+    validate_config()
+    application = ApplicationBuilder().token(TOKEN).build()
+    conversation = ConversationHandler(
+        entry_points=[
+            CommandHandler("start", start),
+            CommandHandler("language", language_command),
+            CallbackQueryHandler(handle_main_menu, pattern=r"^main_menu$"),
+        ],
         states={
-            SELECT_TOPIC: [CallbackQueryHandler(select_topic)],
+            SELECT_LANGUAGE: [CallbackQueryHandler(select_language, pattern=r"^lang:(ru|en|az)$")],
+            SELECT_TOPIC: [CallbackQueryHandler(select_topic, pattern=r"^topic:\d+$")],
             SELECT_RANGE: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_range)],
-            SELECT_COUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_count)],
-            SELECT_QUESTION_AMOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_question_amount)],
-            QUIZ: [CallbackQueryHandler(handle_callback)],
+            SELECT_END: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_end)],
+            SELECT_AMOUNT: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_question_amount)
+            ],
+            QUIZ: [
+                CallbackQueryHandler(
+                    handle_callback, pattern=r"^(?:answer:\d+:[a-z]|main_menu)$"
+                )
+            ],
         },
         fallbacks=[CommandHandler("cancel", cancel)],
+        allow_reentry=True,
     )
+    application.add_handler(
+        CallbackQueryHandler(handle_approval, pattern=r"^(?:approve|deny):\d+$")
+    )
+    application.add_handler(conversation)
+    application.add_handler(CommandHandler("demote", demote_user))
+    application.add_handler(CommandHandler("users", list_users))
+    application.add_error_handler(error_handler)
+    return application
 
-    app.add_handler(CallbackQueryHandler(handle_approval, pattern=r"^(approve|deny)_\d+$"))
-    app.add_handler(conv)
-    app.add_handler(CallbackQueryHandler(handle_main_menu, pattern="^main_menu$"))
-    app.add_handler(CommandHandler("demote", demote_user))
-    app.add_handler(CommandHandler("users", list_users))
-    app.add_error_handler(error_handler)
 
-    app.run_polling()
+def main() -> None:
+    build_application().run_polling(
+        allowed_updates=Update.ALL_TYPES,
+        drop_pending_updates=False,
+    )
 
 
 if __name__ == "__main__":

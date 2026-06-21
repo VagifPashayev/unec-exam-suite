@@ -2,7 +2,7 @@ import sys
 import os
 import json
 import pytest
-import tempfile
+import unittest.mock as mock
 
 # Patch METADATA_FILE and RESULT_FOLDER before importing app
 FAKE_METADATA = {
@@ -12,8 +12,6 @@ FAKE_METADATA = {
 }
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "web"))
-
-import unittest.mock as mock
 
 with mock.patch("builtins.open", mock.mock_open(read_data=json.dumps(FAKE_METADATA))):
     with mock.patch("os.makedirs"):
@@ -38,7 +36,7 @@ def test_index_get(client):
 
 
 def test_index_post_range(client):
-    with mock.patch("web_app.Document") as MockDoc:
+    with mock.patch.object(web_app, "Document") as MockDoc:
         MockDoc.return_value.save = mock.MagicMock()
         with mock.patch("random.sample", return_value=["q1", "q2"]):
             resp = client.post("/", data={"qmin": "1", "qmax": "2", "count": "2", "custom": ""})
@@ -47,7 +45,7 @@ def test_index_post_range(client):
 
 
 def test_index_post_custom(client):
-    with mock.patch("web_app.Document") as MockDoc:
+    with mock.patch.object(web_app, "Document") as MockDoc:
         MockDoc.return_value.save = mock.MagicMock()
         resp = client.post("/", data={"custom": "1 2", "qmin": "", "qmax": "", "count": ""})
     assert resp.status_code == 302

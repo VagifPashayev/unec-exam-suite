@@ -110,11 +110,9 @@ def test_load_question_no_correct_answer():
         "a) Option one",
         "b) Option two",
     ])
-    questions = load_questions_from_docx(path)
+    with pytest.raises(ValueError, match="0 correct answers"):
+        load_questions_from_docx(path)
     os.unlink(path)
-
-    assert len(questions) == 1
-    assert questions[0]["answer"] is None
 
 
 def test_load_preserves_question_text():
@@ -127,3 +125,16 @@ def test_load_preserves_question_text():
     os.unlink(path)
 
     assert "longer question text" in questions[0]["question"]
+
+
+def test_explicit_marker_does_not_confuse_medical_positive_notation():
+    path = _make_docx([
+        "1. Rh factor?",
+        "a) Rh (+)",
+        "b) Rh (-) [[CORRECT]]",
+        "c) Other (+)",
+    ])
+    questions = load_questions_from_docx(path)
+    os.unlink(path)
+    assert questions[0]["answer"] == "b"
+    assert questions[0]["options"][0]["text"] == "Rh (+)"

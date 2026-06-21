@@ -1,53 +1,106 @@
-import os
+"""Strict DOCX quiz loader used by the Telegram bot."""
+
+from __future__ import annotations
+
+import re
+from pathlib import Path
+
 from docx import Document
-from utils import assign_labels
 
 
-def list_docx_files(folder_path):
-    return sorted(f for f in os.listdir(folder_path) if f.endswith(".docx"))
+QUESTION_RE = re.compile(r"^(\d+)[.)]\s*(.+)$")
+OPTION_RE = re.compile(r"^([a-z])[.)]\s*(.+)$", re.IGNORECASE)
 
 
-def load_questions_from_docx(file_path):
-    if not os.path.exists(file_path):
+class QuizFormatError(ValueError):
+    pass
+
+
+def list_docx_files(folder_path: str | Path) -> list[str]:
+    folder = Path(folder_path)
+    if not folder.exists():
+        return []
+    return sorted(
+        path.name
+        for path in folder.iterdir()
+        if path.is_file() and path.suffix.lower() == ".docx" and not path.name.startswith("~$")
+    )
+
+
+def _finish_question(current: dict | None, questions: list[dict]) -> None:
+    if current is None:
+        return
+    number = current["number"]
+    options = current["options"]
+    answers = [option["id"] for option in options if option.pop("correct")]
+    if len(options) < 2:
+        raise QuizFormatError(f"question {number} has fewer than two options")
+    if len({option["id"] for option in options}) != len(options):
+        raise QuizFormatError(f"question {number} has duplicate option labels")
+    if len(answers) != 1:
+        raise QuizFormatError(f"question {number} has {len(answers)} correct answers")
+    current["answer"] = answers[0]
+    questions.append(current)
+
+
+def load_questions_from_docx(file_path: str | Path) -> list[dict]:
+    path = Path(file_path)
+    if not path.exists():
         return []
 
-    document = Document(file_path)
-    questions = []
-    current_question = None
-    current_options = []
-    correct_answer = None
+    document = Document(path)
+    lines = [
+        re.sub(r"\s+", " ", paragraph.text).strip()
+        for paragraph in document.paragraphs
+        if paragraph.text.strip()
+    ]
+    uses_explicit_marker = any("[[CORRECT]]" in line for line in lines)
+    questions: list[dict] = []
+    current: dict | None = None
+    last_target: tuple[str, int | None] | None = None
 
-    for para in document.paragraphs:
-        line = para.text.strip()
-        if not line:
+    for line in lines:
+
+        question_match = QUESTION_RE.match(line)
+        if question_match:
+            _finish_question(current, questions)
+            current = {
+                "number": int(question_match.group(1)),
+                "question": question_match.group(2).strip(),
+                "options": [],
+            }
+            last_target = ("question", None)
             continue
 
-        if line[0].isdigit() and "." in line[:5]:
-            if current_question is not None:
-                questions.append({
-                    "question": current_question,
-                    "options": assign_labels(current_options),
-                    "answer": correct_answer.lower() if correct_answer else None,
-                })
-            current_question = line.split(".", 1)[1].strip()
-            current_options = []
-            correct_answer = None
+        option_match = OPTION_RE.match(line)
+        if option_match and current is not None:
+            text = option_match.group(2).strip()
+            marker_pattern = (
+                r"\s*\[\[CORRECT\]\]\s*$"
+                if uses_explicit_marker
+                else r"\s*\(\+\)\s*$"
+            )
+            marker = re.search(marker_pattern, text)
+            correct = marker is not None
+            if marker:
+                text = text[: marker.start()].rstrip()
+            current["options"].append(
+                {
+                    "id": option_match.group(1).lower(),
+                    "text": text,
+                    "correct": correct,
+                }
+            )
+            last_target = ("option", len(current["options"]) - 1)
+            continue
 
-        elif line[:2] in ("a)", "b)", "c)", "d)", "e)"):
-            if "(+)" in line:
-                correct_answer = line[0]
-                line = line.replace("(+)", "").strip()
-            current_options.append(line)
+        if current is not None and last_target is not None:
+            target, index = last_target
+            if target == "question":
+                current["question"] = f"{current['question']} {line}".strip()
+            elif index is not None:
+                option = current["options"][index]
+                option["text"] = f"{option['text']} {line}".strip()
 
-        else:
-            if current_question is not None:
-                current_question += "\n" + line
-
-    if current_question is not None:
-        questions.append({
-            "question": current_question,
-            "options": assign_labels(current_options),
-            "answer": correct_answer.lower() if correct_answer else None,
-        })
-
+    _finish_question(current, questions)
     return questions

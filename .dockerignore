@@ -1,0 +1,13 @@
+.git
+.github
+.venv
+__pycache__
+*.py[cod]
+*.pdf
+*.env
+backups
+desktop
+pdf_to_docx
+quiz_creator
+tests
+web

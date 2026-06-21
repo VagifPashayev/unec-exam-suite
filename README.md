@@ -1,184 +1,138 @@
-# unec-exam-suite
+# UNEC Exam Suite
 
-A collection of self-study tools built around UNEC/ASOIU exam preparation. Each tool solves a specific part of the workflow — building quiz data from PDFs, converting text exams to quiz files, running quizzes on desktop or in the browser, and running a full quiz bot on Telegram.
+Tools for converting UNEC exam PDFs and running quizzes on Telegram, desktop, or the web. The maintained deployment target is the polling-based Telegram bot; it exposes no public port.
 
-Built for personal use. Everything actually ran and was used during exam sessions.
+## Telegram bot
 
----
+The bot reads DOCX question banks from `telegram_quiz/quizzes/`. On a user's first `/start`, it asks for Russian, English, or Azerbaijani and persists the preference. New users then request access from the administrator.
 
-## What's inside
+Features:
 
-```
-unec-exam-suite/
-├── quiz_creator/       # Tkinter GUI for cropping PDF pages into quiz images
-├── pdf_to_docx/        # Convert text exam PDFs to quiz-ready .docx files
-├── desktop/            # Tkinter desktop quiz app (image-based questions)
-├── telegram_quiz/      # Telegram bot for text-based quizzes from .docx
-├── web/                # Flask web quiz with the same image-based format
-└── tests/              # pytest test suite
-```
+- strict question-bank validation before a quiz starts;
+- safe answer shuffling without losing the correct-answer mapping;
+- validated range and question-count input;
+- protection against repeated callback presses;
+- score, current streak, and actual best-streak tracking;
+- localized Word reports containing every wrong question, all displayed options, the user's answer, and the correct answer;
+- `/language`, `/cancel`, `/users`, and `/demote` commands.
 
----
+### Local setup
 
-## Tools
-
-### 1. `quiz_creator` — PDF crop tool for building image quiz data
-
-A visual desktop tool for converting exam PDFs into image-based quiz data. You open a PDF, draw a selection rectangle over each question and its answer options, mark the correct answer, and the tool saves everything to a `quiz_data/` folder with a `metadata.json` index. That folder is what the `desktop` and `web` quiz players read.
-
-**Requirements:**
-- [Poppler for Windows](https://github.com/oschwartz10612/poppler-windows/releases) — needed by `pdf2image` to render PDF pages
-- Set the `POPPLER_PATH` environment variable to your Poppler `bin/` folder, or edit the fallback path at the top of `quiz_creator.py`
-
-**Usage:**
-```bash
-cd quiz_creator
-pip install -r requirements.txt
-python quiz_creator.py
-```
-
-**Workflow:**
-1. Click **Load PDF** and open your exam file
-2. Draw a box around the question text → confirm → repeat for options A through E
-3. Enter the correct answer letter when prompted
-4. Navigate pages with Prev/Next; use Ctrl+/- to zoom
-5. When done, copy the generated `quiz_data/` folder into `desktop/` or `web/static/`
-
----
-
-### 2. `pdf_to_docx` — PDF to quiz converter
-
-Parses exam PDFs (where answers are marked with `√` and wrong options with `•`) and produces a structured `.docx` file that the Telegram quiz bot can read.
-
-**Format expected in the PDF:**
-```
-1.
-Question text here
-•
-Wrong answer
-√
-Correct answer
-•
-Another wrong answer
-```
-
-**Usage:**
-```bash
-cd pdf_to_docx
-pip install -r requirements.txt
-python convert.py input.pdf output.docx
-```
-
-The output `.docx` will have questions numbered like `1. Question text` with options labeled `a)`, `b)`, `c)` and the correct answer marked with `(+)`.
-
----
-
-### 3. `desktop` — Tkinter quiz app (image questions)
-
-A desktop GUI quiz player for questions where both the question and all answer options are images. Requires a `quiz_data/` folder built with the `quiz_creator` tool.
-
-**Usage:**
-```bash
-cd desktop
-pip install -r requirements.txt
-python quiz_player.py
-```
-
-On start it asks for a question range and count. Options are shuffled on each question. Wrong answers are saved to a `.docx` result file. Use `+` / `-` keys to zoom images.
-
----
-
-### 4. `telegram_quiz` — Telegram bot (text questions from .docx)
-
-A fully async Telegram bot that reads `.docx` files you drop in its folder and runs interactive quizzes via inline buttons. Access is gated — new users send a join request that the admin approves or denies from within Telegram.
-
-**Setup:**
 ```bash
 cd telegram_quiz
+python -m venv .venv
+. .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
-# Fill in BOT_TOKEN and ADMIN_ID in .env
-```
-
-**Add test files:** drop any `.docx` quiz file (in the format produced by `pdf_to_docx`) into the `telegram_quiz/` folder.
-
-**Run:**
-```bash
 python main.py
 ```
 
-**Bot flow:**
-1. User sends `/start`
-2. If not approved → request goes to admin with Approve / Deny buttons
-3. Admin approves → user gets access
-4. User picks a test file → selects question range → picks count → quiz begins
-5. Each question shows shuffled options as single-letter inline buttons (A, B, C...)
-6. Wrong answers show feedback inline; right answers move to next question silently
-7. At the end a `.docx` summary with all wrong questions is sent as a file
+Required secrets:
 
-**Admin commands:**
-| Command | Description |
-|---|---|
-| `/users` | List all approved users |
-| `/demote <id or @username>` | Revoke a user's access |
-
----
-
-### 5. `web` — Flask web quiz (image questions)
-
-Same quiz format as the desktop app but runs in the browser. Useful when sharing with others — just run the server and give them the URL.
-
-**Setup:**
-```bash
-cd web
-pip install -r requirements.txt
+```dotenv
+BOT_TOKEN=replace_with_botfather_token
+ADMIN_ID=replace_with_numeric_telegram_user_id
 ```
 
-**Add quiz data:** copy your `quiz_data/` folder (with images and `metadata.json`) into `web/static/quiz_data/`.
+Never commit `.env`.
 
-**Run:**
-```bash
-python app.py
-# Open http://localhost:5000
-```
+## Converting a PDF
 
-**Flow:**
-- Start page: enter question range or paste specific question numbers (e.g. `12 56 88`)
-- Each question shows the question image and option images as clickable buttons
-- Wrong answer → review page shows correct vs chosen with colored borders
-- Finish page → download `.docx` with all wrong questions
-
----
-
-## Running tests
+The converter supports both legacy `√`/`•` PDFs and UNEC PDFs where the correct option is red.
 
 ```bash
-pip install pytest python-docx Flask
-pytest tests/ -v
+python pdf_to_docx/convert.py input.pdf telegram_quiz/quizzes/output.docx
 ```
 
-Tests cover: question loader, PDF parser, progress bar utility, and Flask web routes.
+An optional third argument enforces the expected question count:
 
----
+```bash
+python pdf_to_docx/convert.py input.pdf output.docx 1415
+```
 
-## Environment variables
+Conversion fails if a question has fewer than two options, duplicate labels, or anything other than one correct answer. Exact repeated source questions with the same source number are removed, and the final bank is renumbered sequentially.
 
-| Variable | Used in | Description |
-|---|---|---|
-| `BOT_TOKEN` | telegram_quiz | Telegram bot token from @BotFather |
-| `ADMIN_ID` | telegram_quiz | Your Telegram user ID |
-| `POPPLER_PATH` | quiz_creator | Path to Poppler `bin/` folder (Windows only) |
+## Tests
 
-Each bot has its own `.env.example`. Copy it to `.env` and fill in the values. **Never commit `.env` files.**
+```bash
+pip install -r tests/requirements.txt
+pip install -r telegram_quiz/requirements.txt -r pdf_to_docx/requirements.txt
+pytest tests -q
+```
 
----
+## Docker deployment
 
-## Requirements per tool
+The Compose stack uses polling, a dedicated bridge network and state volume, no host ports, a non-root read-only container, automatic restart, Telegram-aware healthcheck, log rotation, and CPU/RAM/PID limits.
 
-| Tool | Key dependencies |
-|---|---|
-| `quiz_creator` | Pillow, pdf2image, Poppler |
-| `pdf_to_docx` | PyMuPDF, python-docx |
-| `desktop` | Pillow, python-docx |
-| `telegram_quiz` | python-telegram-bot v21, python-docx, python-dotenv |
-| `web` | Flask, python-docx |
+### First deployment
+
+```bash
+sudo install -d -o deploy -g deploy /opt/unec-exam-bot
+git clone https://github.com/VagifPashayev/unec-exam-suite.git /opt/unec-exam-bot
+cd /opt/unec-exam-bot
+cp telegram_quiz/.env.example .env
+chmod 600 .env
+# Edit BOT_TOKEN and ADMIN_ID without printing them to the terminal.
+docker compose config --quiet
+docker compose up -d --build
+docker compose ps
+```
+
+### Update
+
+```bash
+cd /opt/unec-exam-bot
+git pull --ff-only
+docker compose config --quiet
+docker compose up -d --build
+docker compose ps
+```
+
+### Restart and logs
+
+```bash
+cd /opt/unec-exam-bot
+docker compose restart bot
+docker compose logs --follow --tail=200 bot
+```
+
+### Back up state and configuration
+
+```bash
+cd /opt/unec-exam-bot
+mkdir -p backups
+chmod 700 backups
+VOLUME=$(docker volume ls -q \
+  --filter label=com.docker.compose.project=unec-exam-bot \
+  --filter label=com.docker.compose.volume=bot_data)
+docker run --rm -v "$VOLUME:/data:ro" -v "$PWD/backups:/backup" alpine \
+  tar -czf "/backup/bot-data-$(date +%Y%m%d-%H%M%S).tar.gz" -C /data .
+cp --preserve=mode .env "backups/env-$(date +%Y%m%d-%H%M%S)"
+```
+
+### Roll back application code
+
+```bash
+cd /opt/unec-exam-bot
+git log --oneline -10
+git checkout <known-good-commit>
+docker compose config --quiet
+docker compose up -d --build
+```
+
+Return to the current release later with:
+
+```bash
+git switch main
+git pull --ff-only
+docker compose up -d --build
+```
+
+To restore state, stop only this bot stack, extract a selected backup into its `bot_data` volume, and start the stack again. Do not modify another Compose project's networks, volumes, containers, or routes.
+
+## Other tools
+
+- `quiz_creator/`: visual PDF crop tool for image quizzes.
+- `desktop/`: Tkinter image-based quiz player.
+- `web/`: Flask image-based quiz player.
+- `pdf_to_docx/`: PDF-to-DOCX question converter.

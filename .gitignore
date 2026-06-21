@@ -21,6 +21,8 @@ web/results/
 
 # Telegram bot state
 telegram_quiz/approved_users.json
+telegram_quiz/data/
+backups/
 
 # LMS bot user data
 lms_bot/data/allowed_users.json
