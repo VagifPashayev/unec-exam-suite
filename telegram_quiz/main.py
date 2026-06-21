@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import logging
+import warnings
 
 from telegram import Update
 from telegram.error import TelegramError
+from telegram.warnings import PTBUserWarning
 from telegram.ext import (
     ApplicationBuilder,
     CallbackQueryHandler,
@@ -57,6 +59,14 @@ for handler in logging.getLogger().handlers:
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("telegram.request").setLevel(logging.WARNING)
 LOGGER = logging.getLogger(__name__)
+
+# The conversation is intentionally tracked per user/chat, not per message.
+# Stale answer callbacks are rejected by the embedded question index.
+warnings.filterwarnings(
+    "ignore",
+    message=r"If 'per_message=False'.*",
+    category=PTBUserWarning,
+)
 
 
 async def error_handler(update: Update | None, context) -> None:
