@@ -42,9 +42,9 @@ def test_result_document_contains_displayed_selected_and_correct_answers(tmp_pat
                 {"letter": "b", "text": "Second", "correct": True},
             ],
             "selected_letter": "a",
-            "selected_text": "First",
+            "selected_text": "stale selected value",
             "correct_letter": "b",
-            "correct_text": "Second",
+            "correct_text": "stale correct value",
         }
     ]
     document = build_result_document(

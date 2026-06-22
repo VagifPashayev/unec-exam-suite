@@ -17,7 +17,7 @@ from telegram.ext import (
     filters,
 )
 
-from config import TOKEN, USER_LANGUAGES, validate_config
+from config import STORAGE, TOKEN, validate_config
 from handlers import (
     QUIZ,
     SELECT_AMOUNT,
@@ -26,15 +26,22 @@ from handlers import (
     SELECT_RANGE,
     SELECT_TOPIC,
     cancel,
+    admin_panel,
+    approve_user,
+    demote_admin,
     demote_user,
+    download_quiz,
+    handle_admin_callback,
     handle_approval,
     handle_callback,
     handle_end,
     handle_main_menu,
     handle_question_amount,
+    handle_quiz_upload,
     handle_range,
     language_command,
     list_users,
+    promote_user,
     select_language,
     select_topic,
     start,
@@ -76,7 +83,8 @@ async def error_handler(update: Update | None, context) -> None:
     )
     try:
         if update and update.effective_chat:
-            language = USER_LANGUAGES.get(update.effective_user.id, "en")
+            user_id = update.effective_user.id if update.effective_user else 0
+            language = STORAGE.get_language(user_id)
             await context.bot.send_message(
                 chat_id=update.effective_chat.id,
                 text=t(language, "generic_error"),
@@ -96,7 +104,10 @@ def build_application():
         ],
         states={
             SELECT_LANGUAGE: [CallbackQueryHandler(select_language, pattern=r"^lang:(ru|en|az)$")],
-            SELECT_TOPIC: [CallbackQueryHandler(select_topic, pattern=r"^topic:\d+$")],
+            SELECT_TOPIC: [
+                CallbackQueryHandler(select_topic, pattern=r"^topic:\d+$"),
+                CallbackQueryHandler(select_language, pattern=r"^lang:menu$"),
+            ],
             SELECT_RANGE: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_range)],
             SELECT_END: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_end)],
             SELECT_AMOUNT: [
@@ -111,12 +122,17 @@ def build_application():
         fallbacks=[CommandHandler("cancel", cancel)],
         allow_reentry=True,
     )
-    application.add_handler(
-        CallbackQueryHandler(handle_approval, pattern=r"^(?:approve|deny):\d+$")
-    )
-    application.add_handler(conversation)
-    application.add_handler(CommandHandler("demote", demote_user))
-    application.add_handler(CommandHandler("users", list_users))
+    application.add_handler(CallbackQueryHandler(handle_approval, pattern=r"^(?:approve|deny):\d+$"), group=0)
+    application.add_handler(CallbackQueryHandler(download_quiz, pattern=r"^download:\d+$"), group=0)
+    application.add_handler(CallbackQueryHandler(handle_admin_callback, pattern=r"^admin:"), group=0)
+    application.add_handler(MessageHandler(filters.Document.ALL, handle_quiz_upload), group=0)
+    application.add_handler(CommandHandler("admin", admin_panel), group=0)
+    application.add_handler(CommandHandler("users", list_users), group=0)
+    application.add_handler(CommandHandler("approve", approve_user), group=0)
+    application.add_handler(CommandHandler("demote", demote_user), group=0)
+    application.add_handler(CommandHandler("promote", promote_user), group=0)
+    application.add_handler(CommandHandler("demote_admin", demote_admin), group=0)
+    application.add_handler(conversation, group=1)
     application.add_error_handler(error_handler)
     return application
 

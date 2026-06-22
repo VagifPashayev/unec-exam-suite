@@ -9,7 +9,7 @@ services:
       - .env
     environment:
       DATA_DIR: /app/data
-      QUIZ_DIR: /app/telegram_quiz/quizzes
+      QUIZ_DIR: /app/data/quizzes
     restart: unless-stopped
     read_only: true
     tmpfs:

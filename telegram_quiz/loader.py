@@ -32,13 +32,19 @@ def _finish_question(current: dict | None, questions: list[dict]) -> None:
         return
     number = current["number"]
     options = current["options"]
-    answers = [option["id"] for option in options if option.pop("correct")]
+    answers = [option["id"] for option in options if option.get("correct")]
     if len(options) < 2:
         raise QuizFormatError(f"question {number} has fewer than two options")
     if len({option["id"] for option in options}) != len(options):
         raise QuizFormatError(f"question {number} has duplicate option labels")
     if len(answers) != 1:
         raise QuizFormatError(f"question {number} has {len(answers)} correct answers")
+    if not current["question"].strip():
+        raise QuizFormatError(f"question {number} has empty text")
+    if any(not option["text"].strip() for option in options):
+        raise QuizFormatError(f"question {number} has an empty option")
+    for option in options:
+        option.pop("correct", None)
     current["answer"] = answers[0]
     questions.append(current)
 
@@ -103,4 +109,8 @@ def load_questions_from_docx(file_path: str | Path) -> list[dict]:
                 option["text"] = f"{option['text']} {line}".strip()
 
     _finish_question(current, questions)
+    numbers = [question["number"] for question in questions]
+    if len(numbers) != len(set(numbers)):
+        duplicate = next(number for number in numbers if numbers.count(number) > 1)
+        raise QuizFormatError(f"duplicate question number {duplicate}")
     return questions

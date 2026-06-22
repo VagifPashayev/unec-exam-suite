@@ -4,17 +4,27 @@ Tools for converting UNEC exam PDFs and running quizzes on Telegram, desktop, or
 
 ## Telegram bot
 
-The bot reads DOCX question banks from `telegram_quiz/quizzes/`. On a user's first `/start`, it asks for Russian, English, or Azerbaijani and persists the preference. New users then request access from the administrator.
+The bot seeds bundled DOCX banks from `telegram_quiz/quizzes/` into the persistent runtime directory `DATA_DIR/quizzes/`. On a user's first `/start`, it asks for Russian, English, or Azerbaijani and persists the preference. New users then request access from the administrator.
 
 Features:
 
 - strict question-bank validation before a quiz starts;
+- safe in-bot DOCX upload, compatibility report, soft deletion, and audit log;
+- persistent SQLite-backed access roles (`owner`, `admin`, and `user`);
+- original question-bank download for approved users;
 - safe answer shuffling without losing the correct-answer mapping;
 - validated range and question-count input;
 - protection against repeated callback presses;
 - score, current streak, and actual best-streak tracking;
 - localized Word reports containing every wrong question, all displayed options, the user's answer, and the correct answer;
-- `/language`, `/cancel`, `/users`, and `/demote` commands.
+- `/language`, `/cancel`, `/admin`, `/users`, `/approve`, `/demote`,
+  `/promote`, and `/demote_admin` commands.
+
+The `ADMIN_ID` account is the protected owner. Only the owner may grant or
+revoke delegated administrator rights. Delegated administrators can approve or
+block users and add or remove quiz files. Uploaded banks are accepted only when
+every question has 2–26 options, unique numbering, exactly one correct answer,
+safe archive contents, and a Telegram-compatible rendered length.
 
 ### Local setup
 
@@ -62,7 +72,7 @@ pytest tests -q
 
 ## Docker deployment
 
-The Compose stack uses polling, a dedicated bridge network and state volume, no host ports, a non-root read-only container, automatic restart, Telegram-aware healthcheck, log rotation, and CPU/RAM/PID limits.
+The Compose stack uses polling, a dedicated bridge network and state volume, no host ports, a non-root read-only container, automatic restart, Telegram-aware healthcheck, log rotation, and CPU/RAM/PID limits. SQLite state, uploaded quizzes, and the protected trash directory live under `/app/data` in `bot_data`. On the first upgraded start, legacy JSON access lists are migrated and bundled quizzes are copied into this volume.
 
 ### First deployment
 

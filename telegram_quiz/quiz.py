@@ -203,6 +203,12 @@ def build_result_document(
             question = document.add_paragraph(item["question"])
             question.runs[0].bold = True
 
+            option_map = {option["letter"]: option for option in item["options"]}
+            selected_option = option_map.get(item["selected_letter"])
+            correct_option = option_map.get(item["correct_letter"])
+            if selected_option is None or correct_option is None:
+                raise ValueError(f"question {item['number']} has inconsistent report answers")
+
             for option in item["options"]:
                 paragraph = document.add_paragraph(style="List Bullet")
                 run = paragraph.add_run(
@@ -219,7 +225,7 @@ def build_result_document(
             selected_label.bold = True
             selected_label.font.color.rgb = RGBColor(0x9B, 0x1C, 0x1C)
             selected.add_run(
-                f"{item['selected_letter'].upper()}) {item['selected_text']}"
+                f"{item['selected_letter'].upper()}) {selected_option['text']}"
             )
 
             correct = document.add_paragraph()
@@ -227,7 +233,7 @@ def build_result_document(
             correct_label.bold = True
             correct_label.font.color.rgb = RGBColor(0x1F, 0x5E, 0x35)
             correct.add_run(
-                f"{item['correct_letter'].upper()}) {item['correct_text']}"
+                f"{item['correct_letter'].upper()}) {correct_option['text']}"
             )
 
     footer = section.footer.paragraphs[0]
